@@ -75,12 +75,6 @@ entity Vga is
            VGA_GREEN_O  : out  STD_LOGIC_VECTOR (3 downto 0); -- Green signal going to the VGA interface
            VGA_BLUE_O   : out  STD_LOGIC_VECTOR (3 downto 0); -- Blue signal going to the VGA interface
            -- Input Signals
-           -- Accelerometer
-           ACCEL_RADIUS : in  STD_LOGIC_VECTOR (11 downto 0); -- Size of the box moving when the board is tilted
-           LEVEL_THRESH : in  STD_LOGIC_VECTOR (11 downto 0); -- Size of the internal box in which the moving box is green
-           ACL_X_IN       : in  STD_LOGIC_VECTOR (8 downto 0); -- X Acceleration Data
-           ACL_Y_IN       : in  STD_LOGIC_VECTOR (8 downto 0); -- Y Acceleration Data
-           ACL_MAG_IN     : in  STD_LOGIC_VECTOR (11 downto 0); -- Acceleration Magnitude
            -- Temperature data signals
            XADC_TEMP_VALUE_I     : in std_logic_vector (11 downto 0); -- FPGA Temperature data from the XADC
            ADT7420_TEMP_VALUE_I  : in std_logic_vector (12 downto 0); -- Temperature data from the Onboard Temperature Sensor
@@ -143,41 +137,7 @@ architecture Behavioral of Vga is
           );
    END COMPONENT;
 
-
-   -- Display the moving box and acceleration magnitude according to accelerometer data
-	COMPONENT AccelDisplay
-  	GENERIC
-   (
-      X_XY_WIDTH   : natural := 511; -- Width of the Accelerometer frame X-Y region
-      X_MAG_WIDTH  : natural := 50;  -- Width of the Accelerometer frame Magnitude region
-      Y_HEIGHT     : natural := 511; -- Height of the Accelerometer frame
-      X_START      : natural := 385; -- Accelerometer frame X-Y region starting horizontal location
-      Y_START      : natural := 80; -- Accelerometer frame starting vertical location
-      BG_COLOR : STD_LOGIC_VECTOR (11 downto 0) := x"FFF"; -- Background color - white
-      ACTIVE_COLOR : STD_LOGIC_VECTOR (11 downto 0) := x"0F0"; -- Green when inside the threshold box
-      WARNING_COLOR : STD_LOGIC_VECTOR (11 downto 0) := x"F00" -- Red when outside the threshold box
-	);
-	PORT
-   (
-		CLK_I : IN std_logic;
-		H_COUNT_I : IN std_logic_vector(11 downto 0);
-		V_COUNT_I : IN std_logic_vector(11 downto 0);
-		ACCEL_X_I : IN std_logic_vector(8 downto 0); -- X acceleration input data
-		ACCEL_Y_I : IN std_logic_vector(8 downto 0); -- Y acceleration input data
-		ACCEL_MAG_I : IN std_logic_vector(8 downto 0); -- Acceleration magnitude input data
-      ACCEL_RADIUS : IN  STD_LOGIC_VECTOR (11 downto 0); -- Size of the box moving according to acceleration data
-      LEVEL_THRESH : IN  STD_LOGIC_VECTOR (11 downto 0); -- Size of the threshold box
-      -- Acceleerometer Red, Green and Blue signals
-		RED_O    : OUT std_logic_vector(3 downto 0);
-		BLUE_O   : OUT std_logic_vector(3 downto 0);
-		GREEN_O  : OUT std_logic_vector(3 downto 0)
-	);
-	END COMPONENT;
-   
-
-
-
--------------------------------------------------------------
+------------------------------------------------------------
 
 -- Constants for various VGA Resolutions
 
@@ -297,28 +257,6 @@ constant TBOX_RIGHT			: natural := FRM_TBOX_H_LOC + SZ_TBOX_WIDTH + 1;
 constant TBOX_TOP				: natural := FRM_TBOX_V_LOC - 1;
 constant TBOX_BOTTOM			: natural := FRM_TBOX_V_LOC + SZ_TBOX_HEIGHT + 1;
 
-
--------------------------------------------------------------------------
-
--- Constants for setting size and location for the Accelerometer display
-
---------------------------------------------------------------------------
--- Accelerometer X and Y data is scaled to 0-511 pixels, such as 0: -1g, 255: 0g, 511: +1g
-constant SZ_ACL_XY_WIDTH   : natural := 511; -- Width of the Accelerometer frame X-Y Region
-constant SZ_ACL_MAG_WIDTH  : natural := 45; -- Width of the Accelerometer frame Magnitude Region
-constant SZ_ACL_WIDTH  		: natural := SZ_ACL_XY_WIDTH + SZ_ACL_MAG_WIDTH; -- Width of the entire Accelerometer frame
-constant SZ_ACL_HEIGHT 		: natural := 511; -- Height of the Accelerometer frame
-
-constant FRM_ACL_H_LOC 		: natural := 385; -- Accelerometer frame X-Y region starting horizontal location
-constant FRM_ACL_MAG_LOC 	: natural := FRM_ACL_H_LOC + SZ_ACL_MAG_WIDTH; -- Accelerometer frame Magnitude Region starting horizontal location
-constant FRM_ACL_V_LOC 		: natural := 80; -- Accelerometer frame starting vertical location
--- Accelerometer Display frame limits
-constant ACL_LEFT				: natural := FRM_ACL_H_LOC - 1;
-constant ACL_RIGHT			: natural := FRM_ACL_H_LOC + SZ_ACL_WIDTH + 1;
-constant ACL_TOP				: natural := FRM_ACL_V_LOC - 1;
-constant ACL_BOTTOM			: natural := FRM_ACL_V_LOC + SZ_ACL_HEIGHT + 1;
-
-
 -------------------------------------------------------------------------
 
 -- Signal Declarations
@@ -373,12 +311,6 @@ signal XADC_TEMP_VALUE_I_REG     : std_logic_vector (11 downto 0);
 signal ADT7420_TEMP_VALUE_I_REG  : std_logic_vector (12 downto 0);
 signal ADXL362_TEMP_VALUE_I_REG  : std_logic_vector (11 downto 0);
 
-signal ACCEL_RADIUS_REG : STD_LOGIC_VECTOR (11 downto 0);
-signal LEVEL_THRESH_REG : STD_LOGIC_VECTOR (11 downto 0);
-signal ACL_X_IN_REG     : STD_LOGIC_VECTOR (8 downto 0);
-signal ACL_Y_IN_REG     : STD_LOGIC_VECTOR (8 downto 0);
-signal ACL_MAG_IN_REG   : STD_LOGIC_VECTOR (11 downto 0);
-
 -----------------------------------------------------------
 -- Signals for generating the background (moving colorbar)
 -----------------------------------------------------------
@@ -411,20 +343,10 @@ signal adt7420_temp_red    : std_logic_vector (3 downto 0);
 signal adt7420_temp_green  : std_logic_vector (3 downto 0);
 signal adt7420_temp_blue   : std_logic_vector (3 downto 0);
 
--- ADXL362 Accelerometer Temperature Sensor Display Signals
-signal adxl362_temp_red    : std_logic_vector (3 downto 0);
-signal adxl362_temp_green  : std_logic_vector (3 downto 0);
-signal adxl362_temp_blue   : std_logic_vector (3 downto 0);
-
 -- TBOX (frame holding the temperature columns) display signals
 signal tbox_red			: std_logic_vector(3 downto 0);
 signal tbox_blue			: std_logic_vector(3 downto 0);
 signal tbox_green			: std_logic_vector(3 downto 0);
-
--- Accelerometer display dignals
-signal acl_red    : std_logic_vector(3 downto 0);
-signal acl_blue   : std_logic_vector(3 downto 0);
-signal acl_green	: std_logic_vector(3 downto 0);
 
 -- Overlay display signal
 signal overlay_en : std_logic;
@@ -445,21 +367,8 @@ signal adt7420_temp_red_dly    : std_logic_vector (3 downto 0);
 signal adt7420_temp_green_dly  : std_logic_vector (3 downto 0);
 signal adt7420_temp_blue_dly   : std_logic_vector (3 downto 0);
 
--- Registered ADXL362 Accelerometer Temperature Sensor Display Signals
-signal adxl362_temp_red_dly    : std_logic_vector (3 downto 0);
-signal adxl362_temp_green_dly  : std_logic_vector (3 downto 0);
-signal adxl362_temp_blue_dly   : std_logic_vector (3 downto 0);
-
 -- TBOX (frame holding the temperature columns) color is white,
 -- therefore TBOX signals will not be registered again
-
--- Lbox (frame holding the RGB LED columns) signals will be in fact 
--- the incoming RGB LED signals, therefore will not be registered again
-
--- Registered Accelerometer display dignals
-signal acl_red_dly 			: std_logic_vector(3 downto 0);
-signal acl_blue_dly 			: std_logic_vector(3 downto 0);
-signal acl_green_dly			: std_logic_vector(3 downto 0);
 
 -- Registered Overlay display signal
 signal overlay_en_dly : std_logic; 
@@ -556,13 +465,7 @@ register_inputs: process (pxl_clk, v_sync_reg)
          XADC_TEMP_VALUE_I_REG      <= XADC_TEMP_VALUE_I;
          ADT7420_TEMP_VALUE_I_REG   <= ADT7420_TEMP_VALUE_I;
          ADXL362_TEMP_VALUE_I_REG   <= ADXL362_TEMP_VALUE_I;
-
-         ACCEL_RADIUS_REG <= ACCEL_RADIUS;
-         LEVEL_THRESH_REG <= LEVEL_THRESH;
-         ACL_X_IN_REG <= ACL_X_IN;
-         ACL_Y_IN_REG <= ACL_Y_IN;
-         ACL_MAG_IN_REG <= ACL_MAG_IN;
-    
+   
       end if;   
     end if;
 end process register_inputs;
@@ -640,40 +543,8 @@ end process register_inputs;
            TEMP_G_OUT   => adxl362_temp_green,
            TEMP_B_OUT   => adxl362_temp_blue
           ); 
-
-              
-----------------------------------
-
--- Accelerometer display instance
-
-----------------------------------
-   Inst_AccelDisplay: AccelDisplay 
-   GENERIC MAP
-   (
-      X_XY_WIDTH		=> SZ_ACL_XY_WIDTH, -- Width of the Accelerometer frame X-Y region
-      X_MAG_WIDTH    => SZ_ACL_MAG_WIDTH, -- Width of the Accelerometer frame Magnitude region
-      Y_HEIGHT 		=> SZ_ACL_HEIGHT, -- Height of the Accelerometer frame
-      X_START 			=> FRM_ACL_H_LOC, -- Accelerometer frame X-Y region starting horizontal location
-      Y_START 			=> FRM_ACL_V_LOC, -- Accelerometer frame starting vertical location
-      BG_COLOR 		=> x"FFF", -- White
-      ACTIVE_COLOR 	=> x"0F0", -- Green
-      WARNING_COLOR 	=> x"F00" -- Red
-    )
-    PORT MAP
-    (
-      CLK_I => pxl_clk,
-      ACCEL_X_I => ACL_X_IN_REG,
-      ACCEL_Y_I => ACL_Y_IN_REG,
-      ACCEL_MAG_I => ACL_MAG_IN_REG(8 DOWNTO 0), -- only 9 bits are taken into account, data is scaled between 0-500
-      H_COUNT_I => h_cntr_reg,
-      V_COUNT_I => v_cntr_reg,
-      ACCEL_RADIUS => ACCEL_RADIUS_REG,
-      LEVEL_THRESH => LEVEL_THRESH_REG,
-      RED_O => acl_red,
-      BLUE_O => acl_blue,
-      GREEN_O => acl_green
-	 );
-    
+          
+   
 ----------------------------------
 
 -- Overlay display instance
@@ -784,14 +655,6 @@ end process register_inputs;
      			   tbox_red when h_cntr_reg_dly > TBOX_LEFT and h_cntr_reg_dly < TBOX_RIGHT 
                          and v_cntr_reg_dly < TBOX_BOTTOM and v_cntr_reg_dly > TBOX_TOP
                else
-               -- LBOX display
-               lbox_red when h_cntr_reg_dly > LBOX_LEFT and h_cntr_reg_dly < LBOX_RIGHT 
-                         and v_cntr_reg_dly < LBOX_BOTTOM and v_cntr_reg_dly > LBOX_TOP
-               else
-               -- Accelerometer display   
-               acl_red_dly when h_cntr_reg_dly > ACL_LEFT and h_cntr_reg_dly < ACL_RIGHT 
-                            and v_cntr_reg_dly > ACL_TOP and v_cntr_reg_dly < ACL_BOTTOM
-               else
                -- Colorbar will be on the backround
                bg_red_dly;
                 
@@ -814,14 +677,6 @@ end process register_inputs;
      			   tbox_green when h_cntr_reg_dly > TBOX_LEFT and h_cntr_reg_dly < TBOX_RIGHT 
                            and v_cntr_reg_dly < TBOX_BOTTOM and v_cntr_reg_dly > TBOX_TOP
                else
-               -- LBOX display
-               lbox_green when h_cntr_reg_dly > LBOX_LEFT and h_cntr_reg_dly < LBOX_RIGHT 
-                           and v_cntr_reg_dly < LBOX_BOTTOM and v_cntr_reg_dly > LBOX_TOP
-               else
-               -- Accelerometer display
-               acl_green_dly when h_cntr_reg_dly > ACL_LEFT and h_cntr_reg_dly < ACL_RIGHT 
-                              and v_cntr_reg_dly > ACL_TOP and v_cntr_reg_dly < ACL_BOTTOM
-               else
                -- Colorbar will be on the backround
                bg_green_dly;
 
@@ -843,14 +698,6 @@ end process register_inputs;
                -- TBOX display
      			   tbox_blue when h_cntr_reg_dly > TBOX_LEFT and h_cntr_reg_dly < TBOX_RIGHT 
                           and v_cntr_reg_dly < TBOX_BOTTOM and v_cntr_reg_dly > TBOX_TOP
-               else
-               -- LBOX display
-               lbox_blue when h_cntr_reg_dly > LBOX_LEFT and h_cntr_reg_dly < LBOX_RIGHT 
-                          and v_cntr_reg_dly < LBOX_BOTTOM and v_cntr_reg_dly > LBOX_TOP
-               else
-               -- Accelerometer display
-               acl_blue_dly when h_cntr_reg_dly > ACL_LEFT and h_cntr_reg_dly < ACL_RIGHT 
-                             and v_cntr_reg_dly > ACL_TOP and v_cntr_reg_dly < ACL_BOTTOM
                else
                -- Colorbar will be on the backround
                bg_blue_dly;
