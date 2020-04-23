@@ -42,12 +42,6 @@ end FPGAMonitor;
 
 architecture Behavioral of FPGAMonitor is
 
-component LocalRst
-	 Generic ( RESET_PERIOD : natural := 4);
-    Port ( RST_I : in  STD_LOGIC;
-           CLK_I : in  STD_LOGIC;
-           SRST_O : out  STD_LOGIC);
-end component;
 
 	constant DADDR_TEMP : std_logic_vector(6 downto 0) := "0000000";
 	constant DELAY : NATURAL := 10; --us
